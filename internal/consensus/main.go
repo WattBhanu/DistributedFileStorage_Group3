@@ -1,9 +1,15 @@
-package main
+package consensus
 
-func main() {
-	node := NewRaft(1) // create node
+import "time"
 
-	node.StartElection() // node starts election
-	node.BecomeLeader()  // node becomes leader
-	node.SendHeartbeat() // node sends heartbeat
+func RunSimulation() {
+	cluster := &Cluster{}
+
+	for i := 1; i <= 5; i++ {
+		node := NewRaft(i)
+		cluster.AddNode(node)
+		node.Run()
+	}
+
+	time.Sleep(2 * time.Second)
 }

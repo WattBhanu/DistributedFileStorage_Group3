@@ -1,6 +1,11 @@
-package main
+package consensus
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"sync"
+	"time"
+)
 
 // Node states
 type State string
@@ -11,52 +16,148 @@ const (
 	Leader    State = "leader"
 )
 
-// Raft node structure
+// Raft node
 type Raft struct {
-	id       int
-	state    State
-	term     int
-	votedFor int
+	id        int
+	state     State
+	term      int
+	votedFor  int
+	cluster   *Cluster
+	mutex     sync.Mutex
+	election  chan bool
+	heartbeat chan bool
+	stop      chan bool
 }
 
-// Constructor
+// Cluster of Raft nodes
+type Cluster struct {
+	nodes []*Raft
+	mutex sync.Mutex
+}
+
+// Create a new Raft node
 func NewRaft(id int) *Raft {
-	return &Raft{
-		id:       id,
-		state:    Follower,
-		term:     0,
-		votedFor: -1,
+	node := &Raft{
+		id:        id,
+		state:     Follower,
+		term:      0,
+		votedFor:  -1,
+		election:  make(chan bool),
+		heartbeat: make(chan bool),
+		stop:      make(chan bool),
+	}
+	return node
+}
+
+// Add node to cluster
+func (c *Cluster) AddNode(node *Raft) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	node.cluster = c
+	c.nodes = append(c.nodes, node)
+}
+
+// Start node operations
+func (r *Raft) Run() {
+	go r.electionTimer()
+	go r.listenHeartbeats()
+}
+
+// Randomized election timeout
+func (r *Raft) electionTimer() {
+	for {
+		timeout := time.Duration(150+rand.Intn(150)) * time.Millisecond
+		select {
+		case <-time.After(timeout):
+			r.startElection()
+		case <-r.stop:
+			return
+		}
 	}
 }
 
-// Start an election (candidate)
-func (r *Raft) StartElection() {
+// Listen for heartbeats from leader
+func (r *Raft) listenHeartbeats() {
+	for {
+		select {
+		case <-r.heartbeat:
+			r.mutex.Lock()
+			r.state = Follower
+			r.mutex.Unlock()
+		case <-r.stop:
+			return
+		}
+	}
+}
+
+// Start election for this node
+func (r *Raft) startElection() {
+	r.mutex.Lock()
 	r.state = Candidate
 	r.term++
 	r.votedFor = r.id
-	fmt.Println("Node", r.id, "started election for term", r.term)
+	r.mutex.Unlock()
+
+	fmt.Printf("Node %d starts election for term %d\n", r.id, r.term)
+	votes := 1 // vote for self
+
+	// Request votes from other nodes
+	for _, node := range r.cluster.nodes {
+		if node.id != r.id {
+			if node.requestVote(r.id, r.term) {
+				votes++
+			}
+		}
+	}
+
+	// If majority, become leader
+	if votes > len(r.cluster.nodes)/2 {
+		r.mutex.Lock()
+		r.state = Leader
+		r.mutex.Unlock()
+		fmt.Printf("Node %d became leader for term %d\n", r.id, r.term)
+		go r.sendHeartbeats()
+	}
 }
 
-// Request vote from another node (simplified)
-func (r *Raft) RequestVote(candidateID int, term int) bool {
-	if term > r.term || r.votedFor == -1 {
-		r.term = term
+// Request vote from this node
+func (r *Raft) requestVote(candidateID int, term int) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if term > r.term && (r.votedFor == -1 || r.votedFor == candidateID) {
 		r.votedFor = candidateID
+		r.term = term
 		r.state = Follower
 		return true
 	}
 	return false
 }
 
-// Become leader
-func (r *Raft) BecomeLeader() {
-	r.state = Leader
-	fmt.Println("Node", r.id, "became leader")
+// Leader sends heartbeat to all followers
+func (r *Raft) sendHeartbeats() {
+	for {
+		r.mutex.Lock()
+		if r.state != Leader {
+			r.mutex.Unlock()
+			return
+		}
+		r.mutex.Unlock()
+
+		r.cluster.mutex.Lock()
+		for _, node := range r.cluster.nodes {
+			if node.id != r.id {
+				node.heartbeat <- true
+			}
+		}
+		r.cluster.mutex.Unlock()
+
+		fmt.Printf("Leader %d sending heartbeat\n", r.id)
+		time.Sleep(100 * time.Millisecond) // heartbeat interval
+	}
 }
 
-// Send heartbeat (only leader)
-func (r *Raft) SendHeartbeat() {
-	if r.state == Leader {
-		fmt.Println("Leader", r.id, "sending heartbeat")
-	}
+// Stop the node (for simulating failures)
+func (r *Raft) Stop() {
+	close(r.stop)
 }
