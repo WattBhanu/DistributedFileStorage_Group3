@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -27,7 +26,7 @@ type Raft struct {
 	election       chan bool
 	heartbeat      chan bool
 	stop           chan bool
-	heartbeatCount int // Count heartbeats sent
+	heartbeatCount int
 }
 
 // Cluster of Raft nodes
@@ -59,14 +58,11 @@ func (c *Cluster) AddNode(node *Raft) {
 
 // Start node operations
 func (r *Raft) Run() {
-	r.mutex.Lock()
-	r.heartbeatCount = 0
-	r.mutex.Unlock()
 	go r.electionTimer()
 	go r.listenHeartbeats()
 }
 
-// Randomized election timeout
+// Randomized election timeout with backoff to reduce election storms
 func (r *Raft) electionTimer() {
 	for {
 		timeout := time.Duration(150+rand.Intn(150)) * time.Millisecond
@@ -95,16 +91,18 @@ func (r *Raft) listenHeartbeats() {
 
 // Start election for this node
 func (r *Raft) startElection() {
+	// Random backoff to reduce multiple elections at the same time
+	backoff := time.Duration(rand.Intn(50)+20) * time.Millisecond
+	time.Sleep(backoff)
+
 	r.mutex.Lock()
 	r.state = Candidate
 	r.term++
 	r.votedFor = r.id
 	r.mutex.Unlock()
 
-	fmt.Printf("Node %d starts election for term %d\n", r.id, r.term)
 	votes := 1 // vote for self
 
-	// Request votes from other nodes
 	for _, node := range r.cluster.nodes {
 		if node.id != r.id {
 			if node.requestVote(r.id, r.term) {
@@ -113,12 +111,10 @@ func (r *Raft) startElection() {
 		}
 	}
 
-	// If majority, become leader
 	if votes > len(r.cluster.nodes)/2 {
 		r.mutex.Lock()
 		r.state = Leader
 		r.mutex.Unlock()
-		fmt.Printf("Node %d became leader for term %d\n", r.id, r.term)
 		go r.sendHeartbeats()
 	}
 }
@@ -137,38 +133,64 @@ func (r *Raft) requestVote(candidateID int, term int) bool {
 	return false
 }
 
-// Leader sends heartbeat to all followers
+// Leader sends heartbeat with adaptive interval
 func (r *Raft) sendHeartbeats() {
+	interval := 100 * time.Millisecond
+
 	for {
 		r.mutex.Lock()
 		if r.state != Leader {
 			r.mutex.Unlock()
 			return
 		}
-		r.heartbeatCount++ // Increment heartbeat counter
+		r.heartbeatCount++
 		r.mutex.Unlock()
 
 		r.cluster.mutex.Lock()
 		for _, node := range r.cluster.nodes {
 			if node.id != r.id {
-				node.heartbeat <- true
+				select {
+				case node.heartbeat <- true:
+				default:
+					// skip if follower's channel is full to reduce blocking
+				}
 			}
 		}
 		r.cluster.mutex.Unlock()
 
-		fmt.Printf("Leader %d sending heartbeat\n", r.id)
-		time.Sleep(100 * time.Millisecond) // heartbeat interval
+		time.Sleep(interval)
+
+		// Adaptive heartbeat: increase interval slightly if cluster is stable
+		if r.isClusterStable() {
+			interval += 10 * time.Millisecond
+			if interval > 300*time.Millisecond {
+				interval = 300 * time.Millisecond
+			}
+		} else {
+			interval = 100 * time.Millisecond
+		}
 	}
+}
+
+// Simple check: majority of nodes are followers and alive
+func (r *Raft) isClusterStable() bool {
+	count := 0
+	r.cluster.mutex.Lock()
+	for _, node := range r.cluster.nodes {
+		node.mutex.Lock()
+		if node.state == Follower {
+			count++
+		}
+		node.mutex.Unlock()
+	}
+	r.cluster.mutex.Unlock()
+	return count >= len(r.cluster.nodes)/2
 }
 
 // Stop the node (simulate failures)
 func (r *Raft) Stop() {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
 	select {
 	case <-r.stop:
-		// already closed
 	default:
 		close(r.stop)
 	}
