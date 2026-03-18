@@ -1,53 +1,62 @@
 package consensus
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 )
 
-// Extended simulation to test node failures and recovery
-func TestNodeFailures(t *testing.T) {
+// Extended test: network delays + multiple failures
+func TestRaftPerformance(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	cluster := &Cluster{}
 
-	// Create 5 nodes
+	// Step 1: Create 5 nodes
 	for i := 1; i <= 5; i++ {
 		node := NewRaft(i)
 		cluster.AddNode(node)
 		node.Run()
 	}
 
-	// Let cluster run initially
-	time.Sleep(1 * time.Second)
+	// Step 2: Random network delays in heartbeats
+	t.Log("Simulating network delays...")
+	for _, node := range cluster.nodes {
+		go func(n *Raft) {
+			for {
+				time.Sleep(time.Duration(rand.Intn(500)+100) * time.Millisecond) // 100-600ms
+				n.sendHeartbeat() // match the method in raft.go
+			}
+		}(node)
+	}
 
-	// Step 1: Detect current leader
-	var leader *Raft
+	// Step 3: Let cluster stabilize for 2 seconds
+	time.Sleep(2 * time.Second)
+
+	// Step 4: Stop leader + a follower to simulate multiple failures
+	var leader, follower *Raft
 	for _, node := range cluster.nodes {
 		node.mutex.Lock()
 		if node.state == Leader {
 			leader = node
+		} else if follower == nil {
+			follower = node
 		}
 		node.mutex.Unlock()
 	}
 
 	if leader != nil {
 		t.Logf("Stopping leader Node %d", leader.id)
-		leader.Stop() // simulate leader failure
+		leader.Stop()
 	}
-
-	// Step 2: Let followers elect a new leader
-	time.Sleep(2 * time.Second)
-
-	// Step 3: Optional - stop a follower to simulate multiple failures
-	follower := cluster.nodes[0]
-	if follower != leader {
+	if follower != nil {
 		t.Logf("Stopping follower Node %d", follower.id)
 		follower.Stop()
 	}
 
-	// Step 4: Let cluster stabilize
-	time.Sleep(2 * time.Second)
+	// Step 5: Let followers elect a new leader
+	time.Sleep(3 * time.Second)
 
-	// Step 5: Restart failed nodes to simulate recovery
+	// Step 6: Restart failed nodes
 	if leader != nil {
 		t.Logf("Restarting former leader Node %d", leader.id)
 		newLeader := NewRaft(leader.id)
@@ -62,6 +71,6 @@ func TestNodeFailures(t *testing.T) {
 		newFollower.Run()
 	}
 
-	// Step 6: Let cluster stabilize
-	time.Sleep(2 * time.Second)
+	// Step 7: Let cluster stabilize with random heartbeats
+	time.Sleep(3 * time.Second)
 }

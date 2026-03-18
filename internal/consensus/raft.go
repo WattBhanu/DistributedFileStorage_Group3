@@ -116,7 +116,7 @@ func (r *Raft) startElection() {
 		r.state = Leader
 		r.mutex.Unlock()
 		fmt.Printf("Node %d became leader for term %d\n", r.id, r.term)
-		go r.sendHeartbeats()
+		go r.sendHeartbeat() // call singular heartbeat sender
 	}
 }
 
@@ -135,7 +135,7 @@ func (r *Raft) requestVote(candidateID int, term int) bool {
 }
 
 // Leader sends heartbeat to all followers
-func (r *Raft) sendHeartbeats() {
+func (r *Raft) sendHeartbeat() {
 	for {
 		r.mutex.Lock()
 		if r.state != Leader {
