@@ -18,15 +18,16 @@ const (
 
 // Raft node
 type Raft struct {
-	id        int
-	state     State
-	term      int
-	votedFor  int
-	cluster   *Cluster
-	mutex     sync.Mutex
-	election  chan bool
-	heartbeat chan bool
-	stop      chan bool
+	id             int
+	state          State
+	term           int
+	votedFor       int
+	cluster        *Cluster
+	mutex          sync.Mutex
+	election       chan bool
+	heartbeat      chan bool
+	stop           chan bool
+	heartbeatCount int // Count heartbeats sent
 }
 
 // Cluster of Raft nodes
@@ -37,7 +38,7 @@ type Cluster struct {
 
 // Create a new Raft node
 func NewRaft(id int) *Raft {
-	node := &Raft{
+	return &Raft{
 		id:        id,
 		state:     Follower,
 		term:      0,
@@ -46,7 +47,6 @@ func NewRaft(id int) *Raft {
 		heartbeat: make(chan bool),
 		stop:      make(chan bool),
 	}
-	return node
 }
 
 // Add node to cluster
@@ -59,6 +59,9 @@ func (c *Cluster) AddNode(node *Raft) {
 
 // Start node operations
 func (r *Raft) Run() {
+	r.mutex.Lock()
+	r.heartbeatCount = 0
+	r.mutex.Unlock()
 	go r.electionTimer()
 	go r.listenHeartbeats()
 }
@@ -116,7 +119,7 @@ func (r *Raft) startElection() {
 		r.state = Leader
 		r.mutex.Unlock()
 		fmt.Printf("Node %d became leader for term %d\n", r.id, r.term)
-		go r.sendHeartbeat() // call singular heartbeat sender
+		go r.sendHeartbeats()
 	}
 }
 
@@ -135,13 +138,14 @@ func (r *Raft) requestVote(candidateID int, term int) bool {
 }
 
 // Leader sends heartbeat to all followers
-func (r *Raft) sendHeartbeat() {
+func (r *Raft) sendHeartbeats() {
 	for {
 		r.mutex.Lock()
 		if r.state != Leader {
 			r.mutex.Unlock()
 			return
 		}
+		r.heartbeatCount++ // Increment heartbeat counter
 		r.mutex.Unlock()
 
 		r.cluster.mutex.Lock()
@@ -157,7 +161,15 @@ func (r *Raft) sendHeartbeat() {
 	}
 }
 
-// Stop the node (for simulating failures)
+// Stop the node (simulate failures)
 func (r *Raft) Stop() {
-	close(r.stop)
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	select {
+	case <-r.stop:
+		// already closed
+	default:
+		close(r.stop)
+	}
 }
