@@ -107,7 +107,7 @@ func (d *Detector) CheckNode(nodeID string) {
 		return
 	}
 
-	node.MissedHeartbeats++
+	d.recordMissedHeartbeatLocked(node)
 
 	if node.Status == Healthy && d.shouldSuspect(node, now) {
 		d.updateStatusLocked(node, Suspected, fmt.Sprintf("health check failed: %v", err), now)
@@ -144,6 +144,10 @@ func (d *Detector) shouldSuspect(node *NodeHealth, now time.Time) bool {
 
 func (d *Detector) shouldFail(node *NodeHealth, now time.Time) bool {
 	return now.Sub(node.LastHeartbeat) >= d.cfg.FailureTimeout
+}
+
+func (d *Detector) recordMissedHeartbeatLocked(node *NodeHealth) {
+	node.MissedHeartbeats++
 }
 
 func (d *Detector) updateStatusLocked(node *NodeHealth, status HealthStatus, reason string, now time.Time) {
