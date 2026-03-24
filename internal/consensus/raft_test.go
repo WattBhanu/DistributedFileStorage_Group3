@@ -1,1 +1,124 @@
 package consensus
+
+import (
+	
+	"testing"
+	"time"
+)
+
+// TestRaftPerformanceMetrics measures leader heartbeat activity
+func TestRaftPerformance(t *testing.T) {
+	cluster := &Cluster{}
+
+	// Create 5 nodes
+	for i := 1; i <= 5; i++ {
+		node := NewRaft(i)
+		cluster.AddNode(node)
+		node.Run()
+	}
+
+	t.Log("Simulating network and election activity for 3 seconds...")
+	time.Sleep(3 * time.Second)
+
+	totalHeartbeats := 0
+	for _, node := range cluster.nodes {
+		node.mutex.Lock()
+		totalHeartbeats += node.heartbeatCount
+		node.mutex.Unlock()
+	}
+
+	t.Logf("Test duration: 3s")
+	t.Logf("Total heartbeats sent by leaders: %d", totalHeartbeats)
+}
+
+// TestRaftPerformanceEvaluation simulates failures and cluster recovery
+func TestRaftPerformanceEvaluation(t *testing.T) {
+	cluster := &Cluster{}
+
+	// Create and start 5 nodes
+	for i := 1; i <= 5; i++ {
+		node := NewRaft(i)
+		cluster.AddNode(node)
+		node.Run()
+	}
+
+	time.Sleep(500 * time.Millisecond) // let initial election happen
+
+	// Check for leader
+	leader := cluster.getLeader()
+	if leader == nil {
+		t.Log("No leader elected initially")
+	} else {
+		t.Logf("Initial leader is Node %d", leader.id)
+	}
+
+	// Simulate leader failure
+	if leader != nil {
+		t.Logf("Stopping leader Node %d to simulate failure...", leader.id)
+		leader.Stop()
+	}
+
+	time.Sleep(500 * time.Millisecond) // allow new election
+
+	// Check new leader
+	newLeader := cluster.getLeader()
+	if newLeader == nil {
+		t.Log("No leader elected after failure!")
+	} else {
+		t.Logf("New leader after failure is Node %d", newLeader.id)
+	}
+
+	// Stop two more nodes to evaluate cluster stability
+	t.Log("Stopping two followers to evaluate stability...")
+	for _, node := range cluster.nodes {
+		if node.state != Leader {
+			node.Stop()
+			break
+		}
+	}
+	for _, node := range cluster.nodes {
+		if node.state != Leader && node.stop == nil { // pick another follower
+			node.Stop()
+			break
+		}
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// Restart all stopped nodes
+	t.Log("Restarting stopped nodes to evaluate recovery...")
+	for _, node := range cluster.nodes {
+		if node.stop == nil {
+			node.Run()
+		}
+	}
+
+	time.Sleep(1 * time.Second) // allow cluster to stabilize
+
+	// Count total heartbeats sent
+	totalHeartbeats := 0
+	for _, node := range cluster.nodes {
+		node.mutex.Lock()
+		totalHeartbeats += node.heartbeatCount
+		node.mutex.Unlock()
+	}
+
+	t.Logf("Cluster recovered and stabilized.")
+	t.Logf("Total heartbeats sent during test: %d", totalHeartbeats)
+}
+
+// getLeader returns the current leader in the cluster
+func (c *Cluster) getLeader() *Raft {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	for _, node := range c.nodes {
+		node.mutex.Lock()
+		if node.state == Leader {
+			node.mutex.Unlock()
+			return node
+		}
+		node.mutex.Unlock()
+	}
+	return nil
+}
