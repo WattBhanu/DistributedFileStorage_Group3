@@ -3,14 +3,16 @@ package fault
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
 
 type Detector struct {
-	cfg      DetectorConfig
-	checker  HealthChecker
-	listener EventListener
+	cfg        DetectorConfig
+	checker    HealthChecker
+	listener   EventListener
+	supervisor *ProcessSupervisor
 
 	mu    sync.RWMutex
 	nodes map[string]*NodeHealth
@@ -22,6 +24,17 @@ func NewDetector(cfg DetectorConfig, checker HealthChecker, listener EventListen
 		checker:  checker,
 		listener: listener,
 		nodes:    make(map[string]*NodeHealth),
+	}
+}
+
+// NewDetectorWithSupervisor creates a detector with automatic restart capability
+func NewDetectorWithSupervisor(cfg DetectorConfig, checker HealthChecker, listener EventListener, supervisor *ProcessSupervisor) *Detector {
+	return &Detector{
+		cfg:        cfg,
+		checker:    checker,
+		listener:   listener,
+		supervisor: supervisor,
+		nodes:      make(map[string]*NodeHealth),
 	}
 }
 
@@ -38,6 +51,7 @@ func (d *Detector) AddNode(nodeID, address string) {
 		LastHeartbeat: now,
 		LastChanged:   now,
 	}
+	log.Printf("[FAULT] Added node %s at %s to health monitoring", nodeID, address)
 }
 
 func (d *Detector) RemoveNode(nodeID string) {
@@ -102,19 +116,30 @@ func (d *Detector) CheckNode(nodeID string) {
 		node.LastHeartbeat = now
 		node.MissedHeartbeats = 0
 		if node.Status != Healthy {
+			log.Printf("[FAULT] Node %s recovered: %s", nodeID, "node responded to health check")
 			d.updateStatusLocked(node, Healthy, "node responded to health check", now)
+		} else {
+			log.Printf("[FAULT] Health check OK for node %s", nodeID)
 		}
 		return
 	}
 
+	log.Printf("[FAULT] Health check FAILED for node %s: %v", nodeID, err)
 	d.recordMissedHeartbeatLocked(node)
 
 	if node.Status == Healthy && d.shouldSuspect(node, now) {
+		log.Printf("[FAULT] Node %s marked as SUSPECTED: %s", nodeID, fmt.Sprintf("health check failed: %v", err))
 		d.updateStatusLocked(node, Suspected, fmt.Sprintf("health check failed: %v", err), now)
 	}
 
 	if node.Status == Suspected && d.shouldFail(node, now) {
+		log.Printf("[FAULT] Node %s marked as FAILED: %s", nodeID, fmt.Sprintf("node exceeded failure timeout: %v", err))
 		d.updateStatusLocked(node, Failed, fmt.Sprintf("node exceeded failure timeout: %v", err), now)
+		
+		// Trigger automatic restart if supervisor is available
+		if d.supervisor != nil {
+			go d.supervisor.OnNodeFailure(d, nodeID, addr)
+		}
 	}
 }
 
@@ -122,9 +147,11 @@ func (d *Detector) Run(ctx context.Context) {
 	ticker := time.NewTicker(d.cfg.HeartbeatInterval)
 	defer ticker.Stop()
 
+	log.Printf("[FAULT] Fault detector started with interval %v", d.cfg.HeartbeatInterval)
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("[FAULT] Fault detector stopping...")
 			return
 		case <-ticker.C:
 			for _, node := range d.ListNodes() {

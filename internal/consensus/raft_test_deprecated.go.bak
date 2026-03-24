@@ -1,3 +1,5 @@
+// DEPRECATED: This test file is deprecated and kept for reference only
+// +build ignore
 package consensus
 
 import (
