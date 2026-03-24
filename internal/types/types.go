@@ -58,3 +58,36 @@ type AppendEntriesResponse struct {
 	Term    int64
 	Success bool
 }
+
+// Replication Protocol Types
+type ReplicateRequest struct {
+	Filename  string
+	Data      []byte
+	Timestamp int64
+	Checksum  string
+	Version   int64
+	NodeID    string
+	Operation string
+	Op        string
+}
+
+type ReplicateResponse struct {
+	Filename string
+	NodeID   string
+	Success  bool
+	Checksum string
+	Error    string
+}
+
+// Consistency Verification Types
+type SyncRequest struct {
+	NodeID   string
+	Filename string
+}
+
+type SyncResponse struct {
+	Filename string
+	Found    bool
+	Checksum string
+	Version  int64
+}
