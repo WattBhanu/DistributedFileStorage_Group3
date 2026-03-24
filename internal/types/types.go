@@ -37,7 +37,7 @@ type FileMetadata struct {
 
 type VoteRequest struct {
 	Term         int64
-	CandidateID  string
+	CandidateID  interface{} // Can be int or string
 	LastLogIndex int64
 	LastLogTerm  int64
 }
@@ -49,7 +49,7 @@ type VoteResponse struct {
 
 type AppendEntriesRequest struct {
 	Term         int64
-	LeaderID     string
+	LeaderID     interface{} // Can be int or string
 	Entries      []LogEntry
 	LeaderCommit int64
 }
