@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+*.exe
+node.exe
+
+# Data directories
+data-node*/
+data/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
