@@ -51,11 +51,42 @@ import (
 //	}
 //	ok, err := rm.Replicate(entry)
 //	if !ok { log.Fatal("replication failed") }
-func (rm *ReplicationManager) Replicate(entry *types.LogEntry) (bool, error) {
+// Replicate sends a log entry to all follower nodes
+//
+// Algorithm: Leader-Initiated Concurrent Replication
+// Protocol:
+//  1. Check if this node is Raft leader (only leaders can replicate)
+//  2. Snapshot current peer list (to avoid holding lock during network I/O)
+//  3. For each peer, send replication request concurrently via HTTP
+//  4. Wait for all responses
+//  5. Return success if at least one follower confirmed
+//
+// Parameters:
+//   - entry: LogEntry containing file data, checksum, version info, and operation type
+//   - isLeader: true if this node is currently the Raft leader
+//
+// Returns:
+//   - success: true if at least one follower replicated successfully
+//   - error: non-nil only if not leader
+//
+// Example:
+//
+//	if !raftNode.IsLeader() {
+//	    return fmt.Errorf("not leader")
+//	}
+//	entry := &types.LogEntry{
+//	    Filename: "data.txt",
+//	    Data: []byte("content"),
+//	    Checksum: "hash123",
+//	    Op: "WRITE",
+//	}
+//	ok, err := rm.Replicate(entry, true)
+//	if !ok { log.Fatal("replication failed") }
+func (rm *ReplicationManager) Replicate(entry *types.LogEntry, isLeader bool) (bool, error) {
 	rm.mu.RLock()
-	if !rm.isMaster {
+	if !isLeader {
 		rm.mu.RUnlock()
-		return false, fmt.Errorf("not a master")
+		return false, fmt.Errorf("not a leader")
 	}
 
 	// Snapshot current peer list (to avoid holding lock during network I/O)
@@ -107,14 +138,13 @@ func (rm *ReplicationManager) Replicate(entry *types.LogEntry) (bool, error) {
 //
 // Algorithm: HTTP RPC Replication with Acknowledgment
 // Protocol:
-//  1. Acquire read lock to lookup peer address and current version
-//  2. Increment version for this file (optimistic version management)
-//  3. Build ReplicateRequest with version, checksum, data, operation
-//  4. Serialize to JSON
-//  5. POST to peer's /internal/replicate endpoint
-//  6. Parse ReplicateResponse
-//  7. If successful, update local replicationStatus and version tracking (with write lock)
-//  8. Log all outcomes
+//  1. Acquire read lock to lookup peer address
+//  2. Build ReplicateRequest with checksum, data, operation
+//  3. Serialize to JSON
+//  4. POST to peer's /internal/replicate endpoint
+//  5. Parse ReplicateResponse
+//  6. If successful, update local replicationStatus
+//  7. Log all outcomes
 //
 // Failure Handling:
 //   - Peer not found in peers map: log and return false
@@ -123,11 +153,6 @@ func (rm *ReplicationManager) Replicate(entry *types.LogEntry) (bool, error) {
 //   - JSON decode error: log error, return false (peer response malformed)
 //   - Replication rejected (Success==false): log peer error message, return false
 //
-// Version Management:
-//   - Each file version starts at 0
-//   - First replication increments to version 1
-//   - Subsequent replications increment sequentially
-//   - Prevents stale writes at slave nodes via conflict detection
 //
 // Parameters:
 //   - peerID: Unique identifier of target slave node
@@ -139,26 +164,24 @@ func (rm *ReplicationManager) Replicate(entry *types.LogEntry) (bool, error) {
 //
 // Side Effects on Success:
 //   - Updates rm.replicationStatus[peerID] = true
-//   - Updates rm.versions[filename] = newVersion
 //   - Updates rm.checksums[filename] = checksum
 func (rm *ReplicationManager) replicateToNode(peerID string, entry *types.LogEntry) bool {
 	rm.mu.RLock()
 	addr, exists := rm.peers[peerID]
-	currentVersion := rm.versions[entry.Filename]
 	rm.mu.RUnlock()
 
 	if !exists {
-		log.Printf("[%s] Peer %s not found in peer list\n", rm.nodeID, peerID)
+		log.Printf("[%s] [REPLICATION] Peer %s not found in peer list\n", rm.nodeID, peerID)
 		return false
 	}
 
-	// Build replication request with incremented version
+	// Build replication request
 	req := &types.ReplicateRequest{
 		Filename:  entry.Filename,
 		Data:      entry.Data,
 		Timestamp: entry.Timestamp,
 		Checksum:  entry.Checksum,
-		Version:   currentVersion + 1,
+		Version:   0,
 		NodeID:    rm.nodeID,
 		Operation: entry.Op,
 		Op:        entry.Op,
@@ -168,6 +191,8 @@ func (rm *ReplicationManager) replicateToNode(peerID string, entry *types.LogEnt
 	url := fmt.Sprintf("http://%s/internal/replicate", addr)
 
 	// Send HTTP POST request
+	log.Printf("[%s] [REPLICATION] Sending %s operation for %s to %s at %s", 
+		rm.nodeID, req.Operation, entry.Filename, peerID, url)
 	resp, err := rm.httpClient.Post(url, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		log.Printf("[%s] HTTP POST to %s failed: %v\n", rm.nodeID, peerID, err)
@@ -197,48 +222,36 @@ func (rm *ReplicationManager) replicateToNode(peerID string, entry *types.LogEnt
 	// Update local state on successful replication
 	rm.mu.Lock()
 	rm.replicationStatus[peerID] = true
-	rm.versions[entry.Filename] = req.Version
 	rm.checksums[entry.Filename] = req.Checksum
 	rm.mu.Unlock()
 
-	log.Printf("[%s] ✓ Replicated %s (v%d) to %s\n", rm.nodeID, entry.Filename, req.Version, peerID)
+	log.Printf("[%s] ✓ Replicated %s to %s\n", rm.nodeID, entry.Filename, peerID)
 	return true
 }
 
-// HandleReplicateRequest processes incoming replication from the master
+// HandleReplicateRequest processes incoming replication from the Raft leader
 //
-// Algorithm: Slave-Side Replication Application with Conflict Resolution
+// Algorithm: Follower-Side Replication Application with Conflict Resolution
 //
 // Entry Points:
-//   - Master sending data: Operation is WRITE or DELETE
-//   - Slave is receiver: isMaster == false
+//   - Raft Leader sending data: Operation is WRITE or DELETE
+//   - Follower is receiver: accepts replication from leader
 //
 // Validations:
-//  1. Reject if this node is master (masters don't accept replication)
-//  2. For DELETE: Simply remove file from tracking (no version check needed)
-//  3. For WRITE: Check version-based conflict
-//
-// Conflict Resolution (Version-Based):
-// Algorithm: Last-Write-Wins with Stale-Write Rejection
-//  1. Extract current version for file from local state
-//  2. If incoming version ≤ current version: REJECT (stale write)
-//  3. Otherwise: ACCEPT and update to new version
-//  4. Rationale: Prevents overwriting newer data with older data
-//  5. Assumes master always sends monotonically increasing versions
+//  1. For DELETE: Simply remove file from tracking (no version check needed)
+//  2. For WRITE: Accepts replication without version conflict detection
 //
 // State Updates on Success:
-//   - versions[filename] = new version
 //   - checksums[filename] = new checksum
 //
 // Parameters:
-//   - req: ReplicateRequest from master
+//   - req: ReplicateRequest from leader
 //
 // Returns:
 //   - ReplicateResponse with Success/Error fields
 //
 // Example Response Cases:
 //   - Success=true, Checksum=hash: Data accepted and applied
-//   - Success=false, Error="master cannot receive": Node is master
 //   - Success=false, Error="stale write: ...": Version conflict detected
 func (rm *ReplicationManager) HandleReplicateRequest(req *types.ReplicateRequest) *types.ReplicateResponse {
 	resp := &types.ReplicateResponse{
@@ -247,16 +260,9 @@ func (rm *ReplicationManager) HandleReplicateRequest(req *types.ReplicateRequest
 		Success:  false,
 	}
 
-	// Only slaves accept replication
-	if rm.isMaster {
-		resp.Error = "master cannot receive replication"
-		return resp
-	}
-
-	// Handle DELETE operations (no versioning needed)
+	// Handle DELETE operations
 	if req.Operation == "DELETE" {
 		rm.mu.Lock()
-		delete(rm.versions, req.Filename)
 		delete(rm.checksums, req.Filename)
 		rm.mu.Unlock()
 
@@ -265,25 +271,20 @@ func (rm *ReplicationManager) HandleReplicateRequest(req *types.ReplicateRequest
 		return resp
 	}
 
-	// Handle WRITE operations with version checking
+	// Handle WRITE operations
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
-	currentVersion := rm.versions[req.Filename]
-
-	// Conflict detection: reject stale writes
-	if currentVersion > req.Version {
-		resp.Error = fmt.Sprintf("stale write: local v%d > incoming v%d", currentVersion, req.Version)
-		log.Printf("[%s] ✗ Stale write rejected for %s: %s\n", rm.nodeID, req.Filename, resp.Error)
-		return resp
-	}
-
-	// Apply the replicated data
-	rm.versions[req.Filename] = req.Version
+	// Direct apply on write since versions has been removed
+	// Note: ReplicationManager doesn't have direct storage access,
+	// so we rely on the API layer to handle storage after this returns success
+	// The API handler will call h.Storage.Write() after receiving successful response
+	
+	// Apply the replicated data (update metadata)
 	rm.checksums[req.Filename] = req.Checksum
 	resp.Success = true
 	resp.Checksum = req.Checksum
 
-	log.Printf("[%s] ✓ Applied replication for %s (v%d)\n", rm.nodeID, req.Filename, req.Version)
+	log.Printf("[%s] ✓ Applied replication for %s\n", rm.nodeID, req.Filename)
 	return resp
 }

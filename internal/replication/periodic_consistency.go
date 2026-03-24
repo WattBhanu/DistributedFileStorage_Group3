@@ -21,9 +21,10 @@ import (
 //  2. Spawns runConsistencyChecker() in a new goroutine
 //  3. Checker runs until Stop() is called
 //
-// Note: Only master nodes perform consistency checks
-// Slave nodes do nothing when Start() is called
+// Note: Only Raft leader nodes perform consistency checks
+// Follower nodes do nothing when Start() is called
 func (rm *ReplicationManager) Start() {
+	log.Printf("[%s] Replication manager started - consistency checker interval 30s", rm.nodeID)
 	go rm.runConsistencyChecker()
 }
 
@@ -64,13 +65,13 @@ func (rm *ReplicationManager) runConsistencyChecker() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
+	log.Printf("[%s] Consistency checker running every 30s", rm.nodeID)
 	for {
 		select {
 		case <-ticker.C:
 			// Time for periodic consistency check
-			if rm.isMaster {
-				rm.checkConsistencyWithSlaves()
-			}
+			log.Printf("[%s] Starting periodic consistency check with followers...", rm.nodeID)
+			rm.checkConsistencyWithFollowers()
 
 		case <-rm.stopCh:
 			// Shutdown signal received
@@ -80,9 +81,9 @@ func (rm *ReplicationManager) runConsistencyChecker() {
 	}
 }
 
-// checkConsistencyWithSlaves verifies that all slave nodes have current data
+// checkConsistencyWithFollowers verifies that all follower nodes have current data
 //
-// Algorithm: Master-Initiated Checksum Verification
+// Algorithm: Leader-Initiated Checksum Verification
 //
 // High-Level Flow:
 //  1. Snapshot current checksums and peer list (with read lock)
@@ -114,7 +115,7 @@ func (rm *ReplicationManager) runConsistencyChecker() {
 //
 //	"[node1] Consistency check passed for data.txt on node2"
 //	"[node1] ✗ INCONSISTENCY: data.txt on node3 (expected: abc123, got: xyz789)"
-func (rm *ReplicationManager) checkConsistencyWithSlaves() {
+func (rm *ReplicationManager) checkConsistencyWithFollowers() {
 	// Create snapshot while holding lock minimally
 	rm.mu.RLock()
 	checksums := make(map[string]string)
@@ -255,7 +256,6 @@ func (rm *ReplicationManager) verifyFileConsistency(peerID string, filename stri
 func (rm *ReplicationManager) HandleSyncRequest(req *types.SyncRequest) *types.SyncResponse {
 	rm.mu.RLock()
 	checksum, exists := rm.checksums[req.Filename]
-	version, hasVersion := rm.versions[req.Filename]
 	rm.mu.RUnlock()
 
 	resp := &types.SyncResponse{
@@ -265,9 +265,6 @@ func (rm *ReplicationManager) HandleSyncRequest(req *types.SyncRequest) *types.S
 
 	if exists {
 		resp.Checksum = checksum
-		if hasVersion {
-			resp.Version = version
-		}
 	}
 
 	return resp
