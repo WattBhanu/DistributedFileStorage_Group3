@@ -222,14 +222,12 @@ func (ec *EventClock) NewEvent(eventType string) TimestampedEvent {
 }
 
 // UpdateFromEvent updates clocks based on received event
-func (ec *EventClock) UpdateFromEvent(event TimestampedEvent) TimestampedEvent {
+func (ec *EventClock) UpdateFromEvent(event TimestampedEvent) {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
 
 	ec.lamport.Update(event.LogicalTime.Counter)
 	ec.vector.Update(event.VectorTime)
-
-	return ec.NewEvent(event.EventType)
 }
 
 // HappensBefore determines if event a happened before event b
@@ -254,4 +252,9 @@ func EqualEvents(a, b TimestampedEvent) bool {
 		return false
 	}
 	return true
+}
+
+// GetState returns current counters for Lamport and Vector clocks
+func (ec *EventClock) GetState() (uint64, map[string]uint64) {
+	return ec.lamport.Current(), ec.vector.Current()
 }

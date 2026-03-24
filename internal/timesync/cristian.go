@@ -13,6 +13,7 @@ type CristianClient struct {
 	clock        *MonotonicClock
 	serverNodeID string
 	rtt          time.Duration
+	offset       time.Duration
 	syncInterval time.Duration
 	stopCh       chan struct{}
 	wg           sync.WaitGroup
@@ -25,6 +26,7 @@ func NewCristianClient(clock *MonotonicClock, serverNodeID string, syncInterval 
 		serverNodeID: serverNodeID,
 		syncInterval: syncInterval,
 		rtt:          0,
+		offset:       0,
 		stopCh:       make(chan struct{}),
 	}
 }
@@ -70,6 +72,7 @@ func (c *CristianClient) Synchronize(getServerTime func() (time.Time, error)) Sy
 
 	c.mu.Lock()
 	c.rtt = rtt
+	c.offset = offset
 	c.mu.Unlock()
 
 	return SyncResult{
@@ -113,6 +116,13 @@ func (c *CristianClient) GetRTT() time.Duration {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.rtt
+}
+
+// GetOffset returns the last applied offset calculation
+func (c *CristianClient) GetOffset() time.Duration {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.offset
 }
 
 // CristianServer represents the server side of Cristian's algorithm

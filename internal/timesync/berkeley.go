@@ -12,6 +12,8 @@ type BerkeleyNode struct {
 	clock     *MonotonicClock
 	isLeader  bool
 	delta     time.Duration
+	lastSync  time.Time
+	syncRound int64
 	stopCh    chan struct{}
 	wg        sync.WaitGroup
 	interval  time.Duration
@@ -24,6 +26,7 @@ func NewBerkeleyNode(nodeID string, clock *MonotonicClock, isLeader bool, interv
 		clock:    clock,
 		isLeader: isLeader,
 		delta:    0,
+		lastSync: clock.Now(),
 		stopCh:   make(chan struct{}),
 		interval: interval,
 	}
@@ -145,7 +148,7 @@ func (bl *BerkeleyLeader) BroadcastAdjustments(adjustments map[string]time.Durat
 	// Apply to registered nodes
 	for id, node := range bl.nodes {
 		if adj, ok := adjustments[id]; ok {
-			node.applyAdjustment(adj)
+			node.ApplyAdjustment(adj)
 		}
 	}
 }
@@ -190,17 +193,34 @@ func (bl *BerkeleyLeader) Stop() {
 	bl.wg.Wait()
 }
 
-// applyAdjustment updates the node's clock offset
-func (bn *BerkeleyNode) applyAdjustment(adj time.Duration) {
+// ApplyAdjustment updates the node's clock offset
+// This method is public to allow nodes to apply time adjustments
+func (bn *BerkeleyNode) ApplyAdjustment(adj time.Duration) {
 	bn.mu.Lock()
 	defer bn.mu.Unlock()
-	bn.delta = adj
+	bn.delta += adj // Accumulate total offset (matches how MonotonicClock.AdjustOffset works)
+	bn.lastSync = bn.clock.Now()
+	bn.syncRound++
 	bn.clock.AdjustOffset(adj)
 }
 
-// GetDelta returns the last applied delta
+// GetDelta returns the total accumulated clock offset so far
 func (bn *BerkeleyNode) GetDelta() time.Duration {
 	bn.mu.RLock()
 	defer bn.mu.RUnlock()
 	return bn.delta
+}
+
+// GetLastSyncTime returns the time of the last synchronization
+func (bn *BerkeleyNode) GetLastSyncTime() time.Time {
+	bn.mu.RLock()
+	defer bn.mu.RUnlock()
+	return bn.lastSync
+}
+
+// GetSyncRound returns the total number of synchronization rounds completed
+func (bn *BerkeleyNode) GetSyncRound() int64 {
+	bn.mu.RLock()
+	defer bn.mu.RUnlock()
+	return bn.syncRound
 }
