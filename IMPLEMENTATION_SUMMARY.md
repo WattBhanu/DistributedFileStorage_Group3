@@ -87,11 +87,17 @@ type Handler struct {
 
 **All Components Initialized in node.go:**
 - Storage layer for disk persistence
-- Replication manager for concurrent file replication
+- **Replication manager** for concurrent file replication to followers
 - Fault detector with HTTP health checker (pings every 2s)
 - Raft consensus node for leader election
 - Berkeley time synchronization node (for followers)
 - Monotonic clock for stable timestamps
+
+**Handler Integration**: All components (storage, replication, consensus, fault detection, time sync) wired through Handler struct
+
+**Node Initialization**: `internal/node/node.go` starts all subsystems in coordinated lifecycle
+
+**HTTP Middleware**: CORS, logging, error handling configured centrally
 
 **HTTP Endpoints:**
 
@@ -178,11 +184,16 @@ frontend-react/src/
 ✅ Networked Raft over HTTP RPC (not in-memory channels)  
 ✅ Dynamic leader discovery - followers track known leader from heartbeats
 
-### 5. Replication (Untouched)
+### 5. Replication (FULLY INTEGRATED)
 ✅ Primary-backup model  
 ✅ Version tracking  
 ✅ Checksum verification  
-✅ Conflict resolution
+✅ Conflict resolution  
+✅ Concurrent file replication manager  
+✅ Started in `node.Start()` via replicator initialization  
+✅ Integrated with handler for upload operations  
+✅ Auto-replicates files from leader to all followers  
+✅ Logs replication events with `[REPLICATION]` prefix
 
 ### 6. Fault Tolerance (FULLY INTEGRATED)
 ✅ HTTP health checks via `/api/status` endpoint  
@@ -218,7 +229,7 @@ frontend-react/src/
 - **Created**: 7 React components + 1 backend API file
 - **Modified**: 5 Go files (main.go, 3 API files, storage.go)
 - **Deprecated**: 6 test files (preserved with build ignore)
-- **Removed**: Old vanilla frontend (HTML/CSS/JS), `run/find-npm.bat` (replaced with direct npm calls)
+- **Removed**: Old vanilla frontend (HTML/CSS/JS), `run/find-npm.bat` (replaced with direct npm calls from PATH)
 
 ---
 
@@ -299,9 +310,10 @@ Mobile responsive on all platforms.
 ✅ Conflicts resolved (front + back)  
 ✅ React frontend with built-in icons  
 ✅ No Font Awesome needed - pure SVG  
-✅ Core algorithms untouched  
+✅ **All core algorithms integrated and operational** (Raft, Replication, Fault Tolerance, Time Sync)  
 ✅ Modern, beautiful UI  
-✅ Real-time monitoring dashboard  
+✅ Real-time monitoring dashboard with live data  
+✅ Automated startup scripts with smart dependency management  
 ✅ System works as a whole consistently
 
 ---
