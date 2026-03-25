@@ -31,6 +31,9 @@ cleanup() {
 # Set up trap for cleanup on exit
 trap cleanup INT TERM EXIT
 
+# Get absolute path to workspace
+WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 echo "========================================"
 echo "  Distributed File Storage - Multi-Node Cluster"
 echo "========================================"
@@ -73,9 +76,14 @@ echo ""
 
 # Install React dependencies (only if not already installed)
 echo "📦 Checking React dependencies..."
-cd frontend-react
+cd "$WORKSPACE_DIR/frontend-react"
 if [ ! -d "node_modules" ]; then
     echo "Installing React dependencies..."
+    if ! command -v npm &> /dev/null; then
+        echo "❌ Error: npm is not installed or not in PATH"
+        echo "Please install Node.js and npm first"
+        exit 1
+    fi
     npm install
     if [ $? -ne 0 ]; then
         echo "❌ npm install failed!"
@@ -85,15 +93,15 @@ if [ ! -d "node_modules" ]; then
 else
     echo "✅ Dependencies already present"
 fi
-cd ..
+cd "$WORKSPACE_DIR"
 echo ""
 
 # Start React app in background
 echo "🚀 Starting React frontend..."
-cd frontend-react
+cd "$WORKSPACE_DIR/frontend-react"
 npm start &
 REACT_PID=$!
-cd ..
+cd "$WORKSPACE_DIR"
 
 echo "⏳ Waiting for React to start (5 seconds)..."
 sleep 5

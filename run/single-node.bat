@@ -35,9 +35,16 @@ echo.
 
 REM Install React dependencies (only if not already installed)
 echo Checking React dependencies...
-cd frontend-react
+cd /D "%WORKSPACE_DIR%\frontend-react"
 if not exist "node_modules" (
     echo Installing React dependencies...
+    echo Checking if npm is available...
+    where npm >nul 2>&1
+    if %ERRORLEVEL% NEQ 0 (
+        echo X Error: npm is not installed or not in PATH
+        echo Please install Node.js and npm first
+        exit /b 1
+    )
     call npm install
     if %ERRORLEVEL% NEQ 0 (
         echo X npm install failed!
@@ -47,14 +54,14 @@ if not exist "node_modules" (
 ) else (
     echo [OK] Dependencies already present
 )
-cd ..
+cd /D "%WORKSPACE_DIR%"
 echo.
 
 REM Start React app in background
 echo Starting React frontend...
-cd frontend-react
+cd /D "%WORKSPACE_DIR%\frontend-react"
 start /B npm start
-cd ..
+cd /D "%WORKSPACE_DIR%"
 
 echo Waiting for React to start (5 seconds)...
 timeout /t 5 /nobreak >nul
