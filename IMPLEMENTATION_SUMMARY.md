@@ -4,8 +4,8 @@
 
 **System Status:** Production Ready  
 **Version:** 1.0  
-**Date:** March 24, 2026  
-**Compilation:** No errors, fully consistent  
+**Date:** March 25, 2026  
+**Compilation:** No errors, fully consistent
 
 ---
 
@@ -43,22 +43,21 @@ A complete distributed file storage system with:
 
 ### Run Scripts (Automated Startup & Shutdown)
 - **Windows Batch Files**:
-  - `run/single-node.bat` - Single node with proper Ctrl+C handling (`timeout /t -1`)
-  - `run/multi-node.bat` - 3-node cluster with automatic cleanup
-  - `run/stop-all.bat` - Graceful shutdown of all nodes and frontend
-  - `run/find-npm.bat` - Helper to locate npm even if not in PATH
+    - `run/single-node.bat` - Single node startup
+    - `run/multi-node.bat` - 3-node cluster with automatic process management
+    - `run/stop-all.bat` - Graceful shutdown of all nodes and frontend
 - **Shell Scripts**:
-  - `run/single-node.sh` - Single node with trap-based cleanup
-  - `run/multi-node.sh` - Multi-node cluster with PID tracking
-  - `run/stop-all.sh` - Graceful shutdown script for Linux/Mac
+    - `run/single-node.sh` - Single node with trap-based cleanup
+    - `run/multi-node.sh` - Multi-node cluster with PID tracking
+    - `run/stop-all.sh` - Graceful shutdown script for Linux/Mac
 - **Features**:
-  - Automatic Go build
-  - React dependency installation (only if needed)
-  - Data directory creation
-  - Graceful shutdown on Ctrl+C
-  - Process cleanup via netstat/port-based killing
-  - Comprehensive logging of all operations
-  - **npm auto-detection**: Searches multiple locations if not in PATH
+    - Automatic Go build
+    - React dependency installation (only if needed, uses plain `npm` from PATH)
+    - Data directory creation
+    - Graceful shutdown on Ctrl+C
+    - Process cleanup via netstat/port-based killing
+    - Comprehensive logging of all operations
+- **Requirement**: Node.js must be installed and both `node` + `npm` must be in system PATH before running
 - **Manual Failsafe**: See README.md "Manual Failsafe" section for troubleshooting steps
 
 ### Test Files (Deprecated)
@@ -146,7 +145,7 @@ frontend-react/src/
 ✅ Real-time search filtering  
 ✅ Auto-refresh every 30 seconds  
 ✅ Toast notifications  
-✅ Responsive design  
+✅ Responsive design
 
 ### 2. Algorithm Monitoring (REAL-TIME DATA + COMPREHENSIVE LOGS)
 ✅ **Consensus Panel**: State (Leader/Follower), Leader node, Role, Term, Vote count  
@@ -155,19 +154,19 @@ frontend-react/src/
 ✅ **Time Sync Panel**: Protocol name, Last sync timestamp (from monotonic clock)  
 ✅ Real-time updates every 2 seconds via `/api/metrics` endpoint  
 ✅ All metrics pulled from running algorithms - NO HARDCODED VALUES  
-✅ **Comprehensive Logging**: All components log detailed operational messages  
-  - `[RAFT]` - Election triggers, votes, heartbeats, state changes  
-  - `[FAULT]` - Health checks, node status transitions, failures, recoveries  
-  - `[REPLICATION]` - File replication events, consistency checks, peer verification  
-  - `[TIMESYNC]` - Time synchronization rounds  
-  - `[CONSISTENCY]` - Periodic checksum verification  
+✅ **Comprehensive Logging**: All components log detailed operational messages
+- `[RAFT]` - Election triggers, votes, heartbeats, state changes
+- `[FAULT]` - Health checks, node status transitions, failures, recoveries
+- `[REPLICATION]` - File replication events, consistency checks, peer verification
+- `[TIMESYNC]` - Time synchronization rounds
+- `[CONSISTENCY]` - Periodic checksum verification
 
 ### 3. Storage System
 ✅ Write/Read/Delete operations  
 ✅ SHA256 checksum calculation  
 ✅ File metadata tracking  
 ✅ WAL (Write-Ahead Logging) support  
-✅ Directory structure preservation  
+✅ Directory structure preservation
 
 ### 4. Consensus (FULLY INTEGRATED)
 ✅ Raft leader election running on all nodes  
@@ -177,13 +176,13 @@ frontend-react/src/
 ✅ State machine: Follower → Candidate → Leader  
 ✅ Started in `node.Start()` via `n.consensus.Run()`  
 ✅ Networked Raft over HTTP RPC (not in-memory channels)  
-✅ Dynamic leader discovery - followers track known leader from heartbeats  
+✅ Dynamic leader discovery - followers track known leader from heartbeats
 
 ### 5. Replication (Untouched)
 ✅ Primary-backup model  
 ✅ Version tracking  
 ✅ Checksum verification  
-✅ Conflict resolution  
+✅ Conflict resolution
 
 ### 6. Fault Tolerance (FULLY INTEGRATED)
 ✅ HTTP health checks via `/api/status` endpoint  
@@ -192,7 +191,7 @@ frontend-react/src/
 ✅ Missed heartbeat counting  
 ✅ Recovery procedures (BeginRecovery, CompleteRecovery)  
 ✅ Started in `node.Start()` via `go n.detector.Run(ctx)`  
-✅ Integrated with monitoring dashboard for real-time status  
+✅ Integrated with monitoring dashboard for real-time status
 
 ### 7. Time Synchronization (FULLY INTEGRATED)
 ✅ Berkeley algorithm for coordinator-based sync  
@@ -200,7 +199,7 @@ frontend-react/src/
 ✅ Monotonic clock for stability  
 ✅ Logical clocks (Lamport + Vector) for event ordering  
 ✅ Background synchronization on followers (every 10s)  
-✅ Started in `node.Start()` via `go n.runTimeSynchronization()`  
+✅ Started in `node.Start()` via `go n.runTimeSynchronization()`
 
 ---
 
@@ -209,9 +208,9 @@ frontend-react/src/
 ### Lines of Code
 - **Go Backend**: ~263 lines
 - **React Frontend**: ~780 lines
-  - Components: 391 lines
-  - CSS: 479 lines
-  - Icons: 189 lines
+    - Components: 391 lines
+    - CSS: 479 lines
+    - Icons: 189 lines
 - **Documentation**: ~560 lines
 - **Total**: ~1,603 lines
 
@@ -219,7 +218,7 @@ frontend-react/src/
 - **Created**: 7 React components + 1 backend API file
 - **Modified**: 5 Go files (main.go, 3 API files, storage.go)
 - **Deprecated**: 6 test files (preserved with build ignore)
-- **Removed**: Old vanilla frontend (HTML/CSS/JS)
+- **Removed**: Old vanilla frontend (HTML/CSS/JS), `run/find-npm.bat` (replaced with direct npm calls)
 
 ---
 
@@ -233,7 +232,7 @@ frontend-react/src/
 ✅ **Build Tags**: Deprecated tests excluded  
 ✅ **No Conflicts**: Clean compilation guaranteed  
 ✅ **Git Ignore**: `node_modules/` properly excluded from repository  
-✅ **Smart Dependency Management**: Run scripts auto-install only when needed  
+✅ **Smart Dependency Management**: Run scripts auto-install only when needed
 
 ---
 
@@ -274,7 +273,7 @@ frontend-react/src/
 ✅ Chrome/Edge (Latest)  
 ✅ Firefox (Latest)  
 ✅ Safari (Latest)  
-✅ Opera (Latest)  
+✅ Opera (Latest)
 
 Mobile responsive on all platforms.
 
@@ -286,7 +285,7 @@ Mobile responsive on all platforms.
 **Type Checking:** ✅ Consistent across all files  
 **Import Resolution:** ✅ All references valid  
 **Frontend Build:** ✅ React app compiles successfully  
-**Integration:** ✅ All components wired correctly  
+**Integration:** ✅ All components wired correctly
 
 ---
 
@@ -303,7 +302,7 @@ Mobile responsive on all platforms.
 ✅ Core algorithms untouched  
 ✅ Modern, beautiful UI  
 ✅ Real-time monitoring dashboard  
-✅ System works as a whole consistently  
+✅ System works as a whole consistently
 
 ---
 
@@ -319,7 +318,7 @@ Mobile responsive on all platforms.
 
 ---
 
-**Implementation Date:** March 24, 2026  
+**Implementation Date:** March 25, 2026  
 **Status:** ✅ COMPLETE & VERIFIED  
 **Version:** 1.0 Final  
-**Next Steps:** See IMPLEMENTATION_GUIDE.md for usage instructions
+**Next Steps:** See README.md for usage instructions

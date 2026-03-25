@@ -18,23 +18,30 @@ Group 3
 
 **Prerequisites:**
 - Go 1.26.1 or later
-- Node.js 18+ (REQUIRED for React frontend - npm must be in PATH)
+- Node.js 18+ with npm in system PATH
 
-**Important:** Make sure Node.js is installed and npm is available in your system PATH. If you get "npm not found" errors, install Node.js from https://nodejs.org/
+**Important:** Make sure Node.js is properly installed and **both** `node` and `npm` are available in your system PATH. After installing, open a **new terminal** and verify:
+```
+node -v
+npm -v
+```
+Both must return version numbers. If either fails, reinstall Node.js from https://nodejs.org/ and **restart your PC** before running the scripts.
 
-**Note:** `node_modules` is excluded from Git repository. The run scripts will automatically install React dependencies on first run.
+**Note:** `node_modules` is excluded from the Git repository. The run scripts will automatically install React dependencies on first run.
+
+---
 
 ### 🚀 One-Command Run (Recommended)
 
 **For Windows:**
 
 Single Node:
-```bash
+```batch
 run\single-node.bat
 ```
 
 Multi-Node Cluster:
-```bash
+```batch
 run\multi-node.bat
 ```
 
@@ -98,13 +105,18 @@ chmod +x run/stop-all.sh
 
 ### ⚠️ Manual Failsafe - Troubleshooting Startup Issues
 
-If the automated scripts fail (e.g., npm not found, build errors), use these manual steps:
+If the automated scripts fail, use these manual steps:
 
 #### **Prerequisites Check**
-1. **Install Node.js**: Download from https://nodejs.org/
-2. **Verify npm**: Open new terminal and run `npm --version`
-3. **Install Go**: Download from https://go.dev/
-4. **Verify Go**: Run `go version`
+1. **Install Node.js**: Download from https://nodejs.org/ (LTS version)
+2. **Restart your PC** after installing Node.js
+3. **Verify both node and npm**: Open a new terminal and run:
+   ```
+   node -v
+   npm -v
+   ```
+4. **Install Go**: Download from https://go.dev/
+5. **Verify Go**: Run `go version`
 
 #### **Manual Startup - Single Node (Windows)**
 ```batch
@@ -173,22 +185,31 @@ lsof -ti:3000 | xargs kill -9
 
 #### **Common Issues & Solutions**
 
-**Issue: "npm is not recognized"**
-- **Solution**: Install Node.js from https://nodejs.org/ and restart terminal
-- **Check**: `where npm` (Windows) or `which npm` (Linux/Mac)
+**Issue: "npm is not recognized" or node_modules errors**
+- **Solution**: Reinstall Node.js from https://nodejs.org/ and **restart your PC**
+- Node.js must be installed before running scripts — PATH only updates after a full restart
+- **Check**: Open a new terminal and run `node -v` and `npm -v` — both must work
 
 **Issue: Port already in use**
 - **Solution**: Kill process using the port
   ```batch
-  # Windows - Find PID
+  REM Windows - Find PID
   netstat -ano | findstr :8080
-  # Kill it (replace PID)
+  REM Kill it (replace PID)
   taskkill /F /PID <PID>
   ```
 
-**Issue: React won't build**
-- **Solution**: Clear cache and reinstall
+**Issue: React won't build / node_modules corrupted**
+- **Solution**: Delete node_modules and reinstall
+  ```batch
+  REM Windows PowerShell
+  Remove-Item -Recurse -Force frontend-react\node_modules
+  Remove-Item -Force frontend-react\package-lock.json
+  cd frontend-react
+  npm install
+  ```
   ```bash
+  # Linux/Mac
   cd frontend-react
   rm -rf node_modules package-lock.json
   npm install
@@ -239,11 +260,11 @@ node1=192.168.1.100:8080,node2=192.168.1.101:8081,node3=192.168.1.102:8082
 
 #### View Files
 - **Tree View**: Hierarchical folder structure
-  - Click folders to expand/collapse
-  - See nested file organization
+    - Click folders to expand/collapse
+    - See nested file organization
 - **List View**: Table with details
-  - Shows: Type, Name, Size, Created Date
-  - Click column headers to sort
+    - Shows: Type, Name, Size, Created Date
+    - Click column headers to sort
 
 #### Download Files
 - Click download icon (⬇️) next to any file
@@ -479,15 +500,15 @@ After setup, verify:
 
 If you encounter issues:
 1. Review error messages carefully
-2. Verify all prerequisites installed
+2. Verify all prerequisites installed and PATH is updated (restart PC after Node.js install)
 3. Ensure ports aren't blocked by firewall
-4. Check Go and Node.js versions
+4. Check Go and Node.js versions with `go version`, `node -v`, `npm -v`
 5. See troubleshooting section above
 
 ---
 
 **System Version:** 1.0  
 **Status:** Production Ready  
-**Last Updated:** March 24, 2026
+**Last Updated:** March 25, 2026
 
 For detailed implementation details, see IMPLEMENTATION_SUMMARY.md
