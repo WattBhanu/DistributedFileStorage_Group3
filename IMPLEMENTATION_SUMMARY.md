@@ -21,6 +21,23 @@ A complete distributed file storage system with:
 
 ---
 
+## 👥 Team Contributions
+
+| Registration Number | Name                    | Email                       | Contribution              |
+|---------------------|-------------------------|-----------------------------|---------------------------|
+| IT24610328          | Wattegama B. C.         | wattbhanu@gmail.com         | Time Synchronization      |
+| IT24101848          | Perera H. L. P. S.      | praveensanjaya006@gmail.com | Replication               |
+| IT24103444          | De Silva J. W. D. J. O. | oneldesilva868@gmail.com    | Fault Tolerance           |
+| IT24103469          | Withanage W. D. D. R.   | dinugaransen451@gmail.com   | Consensus                 |
+
+**Contribution Details:**
+- **Wattegama B. C.**: Implemented time synchronization algorithms including Berkeley and Cristian protocols, logical clocks (Lamport and Vector), and monotonic clock infrastructure
+- **Perera H. L. P. S.**: Implemented replication system with primary-backup model, version tracking, checksum verification, conflict resolution, and concurrent file replication manager
+- **De Silva J. W. D. J. O.**: Implemented fault tolerance system with HTTP health checks, heartbeat-based detection, node state machine (HEALTHY → SUSPECTED → FAILED → RECOVERING), and recovery procedures
+- **Withanage W. D. D. R.**: Implemented Raft consensus algorithm with leader election, heartbeat mechanism, adaptive timeouts, vote tracking, and state machine transitions
+
+---
+
 ## 📦 What's Included
 
 ### Backend (Go)
@@ -58,6 +75,7 @@ A complete distributed file storage system with:
     - Process cleanup via netstat/port-based killing
     - Comprehensive logging of all operations
 - **Requirement**: Node.js must be installed and both `node` + `npm` must be in system PATH before running
+- **First Run Note**: On first run or after fresh Node.js install, npm will take 1-2 minutes to install dependencies. After npm completes, **re-run the batch/shell script again** for faster startup as it will skip dependency installation.
 - **Manual Failsafe**: See README.md "Manual Failsafe" section for troubleshooting steps
 
 ### Test Files (Deprecated)

@@ -1,13 +1,13 @@
 # Distributed File Storage System
 
-## Team Members
+## Team Members & Contributions
 
-| Registration Number | Name                    | Email                       |
-|---------------------|-------------------------|-----------------------------|
-| IT24610328          | Wattegama B. C.         | wattbhanu@gmail.com         |
-| IT24101848          | Perera H. L. P. S.      | praveensanjaya006@gmail.com |
-| IT24103444          | De Silva J. W. D. J. O. | oneldesilva868@gmail.com    |
-| IT24103469          | Withanage W. D. D. R.   | dinugaransen451@gmail.com   |
+| Registration Number | Name                    | Email                       | Contribution              |
+|---------------------|-------------------------|-----------------------------|---------------------------|
+| IT24610328          | Wattegama B. C.         | wattbhanu@gmail.com         | Time Synchronization      |
+| IT24101848          | Perera H. L. P. S.      | praveensanjaya006@gmail.com | Replication               |
+| IT24103444          | De Silva J. W. D. J. O. | oneldesilva868@gmail.com    | Fault Tolerance           |
+| IT24103469          | Withanage W. D. D. R.   | dinugaransen451@gmail.com   | Consensus                 |
 
 ## Group
 Group 3
@@ -77,6 +77,13 @@ The automated scripts will:
 - Backend API: http://localhost:8080
 
 **💡 Pro Tip:** Subsequent runs skip dependency installation, making startup faster!
+
+**⚠️ Important Note for First Run:**
+If this is the first time running the scripts or if you've just installed Node.js:
+1. Run the batch file (`single-node.bat` or `multi-node.bat`)
+2. Wait for npm to finish installing dependencies (may take 1-2 minutes on first run)
+3. **Re-run the same batch file again** after npm completes
+4. The second run will be faster as it skips dependency installation
 
 ### 🛑 How to Stop the System
 
