@@ -27,6 +27,7 @@ func NewRouter(handler *Handler) *http.ServeMux {
 	mux.HandleFunc("/internal/time-sync", handler.HandleTimeSync)
 	mux.HandleFunc("/internal/time-adjust", handler.HandleTimeAdjust)
 	mux.HandleFunc("/internal/cristian-time", handler.HandleCristianTime)
+	mux.HandleFunc("/internal/node-recovered", handler.HandleNodeRecovered)
 
 	return mux
 }

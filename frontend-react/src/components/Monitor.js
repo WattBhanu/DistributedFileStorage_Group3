@@ -67,10 +67,12 @@ function Monitor() {
     try {
       console.log(`Fetching from: ${apiBase}/api/metrics`);
       const response = await fetch(`${apiBase}/api/metrics`);
-      const data = await response.json();
-      console.log('Received metrics:', data);
-      setMetrics(data);
-      setLastUpdate(new Date());
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Received metrics:', data);
+        setMetrics(data);
+        setLastUpdate(new Date());
+      }
       
       // Query ALL nodes to find the actual leader (not just the selected node)
       const nodes = ['http://localhost:8080', 'http://localhost:8081', 'http://localhost:8082'];

@@ -93,11 +93,6 @@ func (d *Detector) CheckNode(nodeID string) {
 		return
 	}
 
-	if node.Status == Failed {
-		d.mu.Unlock()
-		return
-	}
-
 	addr := node.Address
 	d.mu.Unlock()
 

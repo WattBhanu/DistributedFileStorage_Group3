@@ -1,8 +1,11 @@
 package fault
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os/exec"
 	"sync"
 	"time"
@@ -135,6 +138,9 @@ func (ps *ProcessSupervisor) restartNode(detector *Detector, nodeID string, addr
 	// Wait for recovery to complete
 	time.Sleep(5 * time.Second)
 	
+	// Broadcast recovery notification to all peers
+	ps.broadcastRecoveryNotification(detector, nodeID, address)
+	
 	// Mark as healthy after successful restart
 	if detector != nil {
 		detector.mu.Lock()
@@ -189,4 +195,52 @@ func extractPort(address string) string {
 		}
 	}
 	return "8080" // default
+}
+
+// broadcastRecoveryNotification notifies all peer nodes that this node has recovered
+func (ps *ProcessSupervisor) broadcastRecoveryNotification(detector *Detector, nodeID string, address string) {
+	log.Printf("[SUPERVISOR] Broadcasting recovery notification for node %s", nodeID)
+	
+	// Get all peer nodes from detector
+	detector.mu.RLock()
+	defer detector.mu.RUnlock()
+	
+	for peerID, peerNode := range detector.nodes {
+		if peerID == nodeID {
+			continue // Skip self
+		}
+		
+		// Send HTTP request to peer to re-add this node
+		go ps.notifyPeerOfRecovery(peerID, peerNode.Address, nodeID, address)
+	}
+}
+
+// notifyPeerOfRecovery sends recovery notification to a specific peer
+func (ps *ProcessSupervisor) notifyPeerOfRecovery(peerID, peerAddr, recoveredNodeID, recoveredNodeAddr string) {
+	url := fmt.Sprintf("http://%s/internal/node-recovered", peerAddr)
+	
+	reqBody := map[string]string{
+		"RecoveredNodeID":   recoveredNodeID,
+		"RecoveredNodeAddr": recoveredNodeAddr,
+	}
+	
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		log.Printf("[SUPERVISOR] Failed to marshal recovery notification for peer %s: %v", peerID, err)
+		return
+	}
+	
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("[SUPERVISOR] Failed to notify peer %s of recovery: %v", peerID, err)
+		return
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode == http.StatusOK {
+		log.Printf("[SUPERVISOR] Peer %s acknowledged recovery of node %s", peerID, recoveredNodeID)
+	} else {
+		log.Printf("[SUPERVISOR] Peer %s returned non-OK status: %d", peerID, resp.StatusCode)
+	}
 }

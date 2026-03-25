@@ -199,6 +199,38 @@ func (h *Handler) HandleTimeSync(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+func (h *Handler) HandleNodeRecovered(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[%s] [FAULT] POST /internal/node-recovered - Node recovery notification received", h.NodeID)
+	
+	var req struct {
+		RecoveredNodeID   string `json:"RecoveredNodeID"`
+		RecoveredNodeAddr string `json:"RecoveredNodeAddr"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("[%s] [FAULT] Recovery notification decode failed: %v", h.NodeID, err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	
+	// Re-add the recovered node to fault detector
+	if h.Detector != nil {
+		// Check if node already exists
+		if _, exists := h.Detector.GetNode(req.RecoveredNodeID); !exists {
+			h.Detector.AddNode(req.RecoveredNodeID, req.RecoveredNodeAddr)
+			log.Printf("[%s] [FAULT] ✓ Re-added recovered node %s at %s", h.NodeID, req.RecoveredNodeID, req.RecoveredNodeAddr)
+		} else {
+			// Node exists, reset its status using RecordHeartbeat
+			h.Detector.RecordHeartbeat(req.RecoveredNodeID, time.Now())
+			log.Printf("[%s] [FAULT] ✓ Reset recovered node %s to healthy", h.NodeID, req.RecoveredNodeID)
+		}
+	} else {
+		log.Printf("[%s] [FAULT] WARNING: No fault detector available to handle recovery", h.NodeID)
+	}
+	
+	w.WriteHeader(http.StatusOK)
+}
+
 func (h *Handler) HandleTimeAdjust(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[%s] [BERKELEY] POST /internal/time-adjust - Time adjust received", h.NodeID)
 
