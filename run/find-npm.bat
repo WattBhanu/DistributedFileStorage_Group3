@@ -41,5 +41,5 @@ exit /b 1
 
 :found
 echo [OK] Found npm at: %NPM_FOUND%
-endlocal & set "NPM_CMD=%NPM_FOUND%"
+set "NPM_CMD=%NPM_FOUND%"
 goto :eof
