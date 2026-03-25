@@ -66,7 +66,7 @@ REM Find npm location if not already set
 if "%NPM_CMD%"=="" (
     call "%WORKSPACE_DIR%\run\find-npm.bat"
 )
-start /B %NPM_CMD% start
+start "React Frontend" %NPM_CMD% start
 cd /D "%WORKSPACE_DIR%"
 
 echo Waiting for React to start (5 seconds)...
