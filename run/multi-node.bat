@@ -64,7 +64,7 @@ if not exist "node_modules" (
     )
     
     echo Running: %NPM_CMD% install
-    call %NPM_CMD% install
+    call "%NPM_CMD%" install
     if %ERRORLEVEL% NEQ 0 (
         echo X npm install failed!
         exit /b 1
@@ -84,7 +84,7 @@ REM Find npm location if not already set
 if "%NPM_CMD%"=="" (
     call "%WORKSPACE_DIR%\run\find-npm.bat"
 )
-start "React Frontend" %NPM_CMD% start
+start "React Frontend" "%NPM_CMD%" start
 cd /D "%WORKSPACE_DIR%"
 
 echo Waiting for React to start (5 seconds)...

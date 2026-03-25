@@ -18,7 +18,9 @@ Group 3
 
 **Prerequisites:**
 - Go 1.26.1 or later
-- Node.js 18+
+- Node.js 18+ (REQUIRED for React frontend - npm must be in PATH)
+
+**Important:** Make sure Node.js is installed and npm is available in your system PATH. If you get "npm not found" errors, install Node.js from https://nodejs.org/
 
 **Note:** `node_modules` is excluded from Git repository. The run scripts will automatically install React dependencies on first run.
 
