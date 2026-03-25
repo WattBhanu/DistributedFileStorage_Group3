@@ -1,5 +1,4 @@
 @echo off
-setlocal EnableDelayedExpansion
 
 REM This script finds npm even if it's not in PATH
 set "NPM_FOUND="
