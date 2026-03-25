@@ -38,14 +38,15 @@ echo Checking React dependencies...
 cd /D "%WORKSPACE_DIR%\frontend-react"
 if not exist "node_modules" (
     echo Installing React dependencies...
-    echo Checking if npm is available...
-    where npm >nul 2>&1
+    
+    REM Find npm location
+    call "%WORKSPACE_DIR%\run\find-npm.bat"
     if %ERRORLEVEL% NEQ 0 (
-        echo X Error: npm is not installed or not in PATH
-        echo Please install Node.js and npm first
         exit /b 1
     )
-    call npm install
+    
+    echo Running: %NPM_CMD% install
+    call %NPM_CMD% install
     if %ERRORLEVEL% NEQ 0 (
         echo X npm install failed!
         exit /b 1
@@ -60,7 +61,12 @@ echo.
 REM Start React app in background
 echo Starting React frontend...
 cd /D "%WORKSPACE_DIR%\frontend-react"
-start /B npm start
+
+REM Find npm location if not already set
+if "%NPM_CMD%"=="" (
+    call "%WORKSPACE_DIR%\run\find-npm.bat"
+)
+start /B %NPM_CMD% start
 cd /D "%WORKSPACE_DIR%"
 
 echo Waiting for React to start (5 seconds)...

@@ -46,6 +46,7 @@ A complete distributed file storage system with:
   - `run/single-node.bat` - Single node with proper Ctrl+C handling (`timeout /t -1`)
   - `run/multi-node.bat` - 3-node cluster with automatic cleanup
   - `run/stop-all.bat` - Graceful shutdown of all nodes and frontend
+  - `run/find-npm.bat` - Helper to locate npm even if not in PATH
 - **Shell Scripts**:
   - `run/single-node.sh` - Single node with trap-based cleanup
   - `run/multi-node.sh` - Multi-node cluster with PID tracking
@@ -57,6 +58,8 @@ A complete distributed file storage system with:
   - Graceful shutdown on Ctrl+C
   - Process cleanup via netstat/port-based killing
   - Comprehensive logging of all operations
+  - **npm auto-detection**: Searches multiple locations if not in PATH
+- **Manual Failsafe**: See README.md "Manual Failsafe" section for troubleshooting steps
 
 ### Test Files (Deprecated)
 - All test files marked with `// DEPRECATED` and `// +build ignore`

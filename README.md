@@ -94,6 +94,114 @@ chmod +x run/stop-all.sh
 
 ---
 
+### ⚠️ Manual Failsafe - Troubleshooting Startup Issues
+
+If the automated scripts fail (e.g., npm not found, build errors), use these manual steps:
+
+#### **Prerequisites Check**
+1. **Install Node.js**: Download from https://nodejs.org/
+2. **Verify npm**: Open new terminal and run `npm --version`
+3. **Install Go**: Download from https://go.dev/
+4. **Verify Go**: Run `go version`
+
+#### **Manual Startup - Single Node (Windows)**
+```batch
+REM Terminal 1 - Build and start Go backend
+cd C:\path\to\DistributedFileStorage_Group3
+go build -o node.exe .\cmd\node
+node.exe -id=node1 -addr=localhost -port=8080 -data=.
+
+REM Terminal 2 - Install and start React frontend
+cd C:\path\to\DistributedFileStorage_Group3\frontend-react
+npm install
+npm start
+```
+
+#### **Manual Startup - Multi-Node Cluster (Windows)**
+```batch
+REM Terminal 1 - Leader node
+go build -o node.exe .\cmd\node
+node.exe -id=node1 -addr=localhost -port=8080 -peers=node2=localhost:8081,node3=localhost:8082
+
+REM Terminal 2 - Follower 1
+node.exe -id=node2 -addr=localhost -port=8081 -peers=node1=localhost:8080,node3=localhost:8082
+
+REM Terminal 3 - Follower 2
+node.exe -id=node3 -addr=localhost -port=8082 -peers=node1=localhost:8080,node2=localhost:8081
+
+REM Terminal 4 - React frontend
+cd frontend-react
+npm install
+npm start
+```
+
+#### **Manual Startup - Linux/Mac**
+```bash
+# Terminal 1 - Backend
+cd /path/to/DistributedFileStorage_Group3
+go build -o node ./cmd/node
+./node -id=node1 -addr=localhost -port=8080
+
+# Terminal 2 - Frontend
+cd frontend-react
+npm install
+npm start
+```
+
+#### **Manual Process Cleanup (If Scripts Fail)**
+**Windows:**
+```batch
+REM Kill all node processes
+taskkill /F /IM node.exe
+taskkill /F /IM manager.exe
+
+REM Kill npm/React processes
+for /f "tokens=5" %a in ('netstat -aon ^| findstr :3000') do taskkill /F /PID %a
+```
+
+**Linux/Mac:**
+```bash
+# Kill all node processes
+pkill -9 -f node
+pkill -9 -f npm
+
+# Kill process on port 3000
+lsof -ti:3000 | xargs kill -9
+```
+
+#### **Common Issues & Solutions**
+
+**Issue: "npm is not recognized"**
+- **Solution**: Install Node.js from https://nodejs.org/ and restart terminal
+- **Check**: `where npm` (Windows) or `which npm` (Linux/Mac)
+
+**Issue: Port already in use**
+- **Solution**: Kill process using the port
+  ```batch
+  # Windows - Find PID
+  netstat -ano | findstr :8080
+  # Kill it (replace PID)
+  taskkill /F /PID <PID>
+  ```
+
+**Issue: React won't build**
+- **Solution**: Clear cache and reinstall
+  ```bash
+  cd frontend-react
+  rm -rf node_modules package-lock.json
+  npm install
+  npm start
+  ```
+
+**Issue: Go compilation errors**
+- **Solution**: Clean build cache
+  ```bash
+  go clean -cache
+  go build ./cmd/node
+  ```
+
+---
+
 ### Manual Running (Advanced)
 
 If you prefer manual control, see detailed instructions in IMPLEMENTATION_SUMMARY.md
